@@ -24,11 +24,13 @@ public struct SlideMenuOptions {
     public static var contentViewScale: CGFloat = 0.96
     public static var contentViewOpacity: CGFloat = 0.5
     public static var contentViewDrag: Bool = false
+    public static var contentCornerRadius: CGFloat = 6.0
     public static var shadowOpacity: CGFloat = 0.0
     public static var shadowRadius: CGFloat = 0.0
     public static var shadowOffset: CGSize = CGSize(width: 0,height: 0)
     public static var panFromBezel: Bool = true
     public static var animationDuration: CGFloat = 0.4
+    public static var viewControllerTransitionDuration: Double = 2.0
     public static var animationOptions: UIViewAnimationOptions = []
     public static var rightViewWidth: CGFloat = 270.0
     public static var rightBezelWidth: CGFloat? = 16.0
@@ -39,6 +41,7 @@ public struct SlideMenuOptions {
 	public static var opacityViewBackgroundColor: UIColor = UIColor.black
     public static var panGesturesEnabled: Bool = true
     public static var tapGesturesEnabled: Bool = true
+    public static var lockPanDirection: Bool = true
 }
 
 open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
@@ -118,6 +121,7 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
     
     open func initView() {
         mainContainerView = UIView(frame: view.bounds)
+        mainContainerView.clipsToBounds = true
         mainContainerView.backgroundColor = UIColor.clear
         mainContainerView.autoresizingMask = [.flexibleHeight, .flexibleWidth]
         view.insertSubview(mainContainerView, at: 0)
@@ -398,6 +402,7 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                 leftContainerView.frame = applyLeftTranslation(translation, toFrame: LeftPanState.frameAtStartOfPan)
                 applyLeftOpacity()
                 applyLeftContentViewScale()
+                applyLeftContentCornerRadius()
             case UIGestureRecognizerState.ended, UIGestureRecognizerState.cancelled:
                 if LeftPanState.lastState != .changed {
                     setCloseWindowLevel()
@@ -479,6 +484,7 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
             rightContainerView.frame = applyRightTranslation(translation, toFrame: RightPanState.frameAtStartOfPan)
             applyRightOpacity()
             applyRightContentViewScale()
+            applyRightContentCornerRadius()
             
         case UIGestureRecognizerState.ended, UIGestureRecognizerState.cancelled:
             if RightPanState.lastState != .changed {
@@ -531,7 +537,7 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
             if let strongSelf = self {
                 strongSelf.leftContainerView.frame = frame
                 strongSelf.opacityView.layer.opacity = Float(SlideMenuOptions.contentViewOpacity)
-              
+                
                 SlideMenuOptions.contentViewDrag == true ? (strongSelf.mainContainerView.transform = CGAffineTransform(translationX: SlideMenuOptions.leftViewWidth, y: 0)) : (strongSelf.mainContainerView.transform = CGAffineTransform(scaleX: SlideMenuOptions.contentViewScale, y: SlideMenuOptions.contentViewScale))
                 
             }
@@ -542,6 +548,8 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                     strongSelf.delegate?.leftDidOpen?()
                 }
         }
+        
+        animateCornerRadius(view: mainContainerView, toValue: SlideMenuOptions.contentCornerRadius, duration: duration)
     }
     
     open func openRightWithVelocity(_ velocity: CGFloat) {
@@ -565,7 +573,7 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
             if let strongSelf = self {
                 strongSelf.rightContainerView.frame = frame
                 strongSelf.opacityView.layer.opacity = Float(SlideMenuOptions.contentViewOpacity)
-            
+                
                 SlideMenuOptions.contentViewDrag == true ? (strongSelf.mainContainerView.transform = CGAffineTransform(translationX: -SlideMenuOptions.rightViewWidth, y: 0)) : (strongSelf.mainContainerView.transform = CGAffineTransform(scaleX: SlideMenuOptions.contentViewScale, y: SlideMenuOptions.contentViewScale))
             }
             }) { [weak self](Bool) -> Void in
@@ -575,6 +583,8 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                     strongSelf.delegate?.rightDidOpen?()
                 }
         }
+        
+        animateCornerRadius(view: mainContainerView, toValue: SlideMenuOptions.contentCornerRadius, duration: duration)
     }
     
     open func closeLeftWithVelocity(_ velocity: CGFloat) {
@@ -597,14 +607,16 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                 strongSelf.opacityView.layer.opacity = 0.0
                 strongSelf.mainContainerView.transform = CGAffineTransform(scaleX: 1.0, y: 1.0)
             }
-            }) { [weak self](Bool) -> Void in
-                if let strongSelf = self {
-                    strongSelf.removeShadow(strongSelf.leftContainerView)
-                    strongSelf.enableContentInteraction()
-                    strongSelf.leftViewController?.endAppearanceTransition()
-                    strongSelf.delegate?.leftDidClose?()
-                }
+        }) { [weak self](Bool) -> Void in
+            if let strongSelf = self {
+                strongSelf.removeShadow(strongSelf.leftContainerView)
+                strongSelf.enableContentInteraction()
+                strongSelf.leftViewController?.endAppearanceTransition()
+                strongSelf.delegate?.leftDidClose?()
+            }
         }
+        
+        animateCornerRadius(view: mainContainerView, toValue: 0.0, duration: duration)
     }
     
     
@@ -636,6 +648,18 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                     strongSelf.delegate?.rightDidClose?()
                 }
         }
+        
+        animateCornerRadius(view: mainContainerView, toValue: 0.0, duration: duration)
+    }
+    
+    func animateCornerRadius(view: UIView, toValue: CGFloat, duration: TimeInterval) {
+        let animation = CABasicAnimation(keyPath: "cornerRadius")
+        animation.timingFunction = CAMediaTimingFunction(name: kCAMediaTimingFunctionEaseOut)
+        animation.fromValue = view.layer.cornerRadius
+        animation.toValue = toValue
+        animation.duration = duration
+        mainContainerView.layer.add(animation, forKey: "cornerRadius")
+        mainContainerView.layer.cornerRadius = toValue
     }
     
     
@@ -679,14 +703,37 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
         return rightContainerView.frame.origin.x >= view.bounds.width
     }
     
-    open func changeMainViewController(_ mainViewController: UIViewController,  close: Bool) {
+    open func changeMainViewController(_ mainViewController: UIViewController,  close: Bool, animated: Bool = true) {
+        defer {
+            if close {
+                closeLeft()
+                closeRight()
+            }
+        }
+        if self.mainViewController === mainViewController {
+            return
+        }
         
-        removeViewController(self.mainViewController)
-        self.mainViewController = mainViewController
-        setUpViewController(mainContainerView, targetViewController: mainViewController)
-        if close {
-            closeLeft()
-            closeRight()
+        if let oldViewContoller = self.mainViewController, oldViewContoller.view.window != nil && animated {
+            addChildViewController(mainViewController)
+            mainViewController.view.frame = mainContainerView.bounds
+            mainViewController.view.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            mainViewController.view.alpha = 0.0
+            self.mainViewController = mainViewController
+            transition(from: oldViewContoller,
+                       to: mainViewController,
+                       duration: SlideMenuOptions.viewControllerTransitionDuration,
+                       options: SlideMenuOptions.animationOptions,
+                       animations: {
+                        mainViewController.view.alpha = 1.0
+                        mainViewController.view.transform = CGAffineTransform.identity
+                        
+            })
+        } else {
+            setUpViewController(mainContainerView, targetViewController: mainViewController)
+            removeViewController(self.mainViewController)
+            self.mainViewController = mainViewController
+            setUpViewController(mainContainerView, targetViewController: mainViewController)
         }
     }
     
@@ -866,6 +913,22 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
         SlideMenuOptions.contentViewDrag == true ? (mainContainerView.transform = CGAffineTransform(translationX: drag, y: 0)) : (mainContainerView.transform = CGAffineTransform(scaleX: scale, y: scale))
     }
     
+    fileprivate func applyLeftContentCornerRadius() {
+        if SlideMenuOptions.contentCornerRadius < 0.5 {
+            return
+        }
+        let openedLeftRatio: CGFloat = getOpenedLeftRatio()
+        mainContainerView.layer.cornerRadius = SlideMenuOptions.contentCornerRadius * openedLeftRatio
+    }
+    
+    fileprivate func applyRightContentCornerRadius() {
+        if SlideMenuOptions.contentCornerRadius < 0.5 {
+            return
+        }
+        let openedRightRatio: CGFloat = getOpenedRightRatio()
+        mainContainerView.layer.cornerRadius = SlideMenuOptions.contentCornerRadius * openedRightRatio
+    }
+    
     fileprivate func addShadowToView(_ targetContainerView: UIView) {
         targetContainerView.layer.masksToBounds = false
         targetContainerView.layer.shadowOffset = SlideMenuOptions.shadowOffset
@@ -983,6 +1046,19 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
     // returning true here helps if the main view is fullwidth with a scrollview
     open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return SlideMenuOptions.simultaneousGestureRecognizers
+    }
+    
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let panRecognizer = gestureRecognizer as? UIPanGestureRecognizer,
+            let view = panRecognizer.view else {
+                return true
+        }
+        if !SlideMenuOptions.lockPanDirection {
+            return true
+        }
+        
+        let translation = panRecognizer.translation(in: view)
+        return abs(translation.x) >= abs(translation.y)
     }
     
     fileprivate func slideLeftForGestureRecognizer( _ gesture: UIGestureRecognizer, point:CGPoint) -> Bool{
