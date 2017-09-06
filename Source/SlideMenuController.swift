@@ -727,7 +727,9 @@ open class SlideMenuController: UIViewController, UIGestureRecognizerDelegate {
                        animations: {
                         mainViewController.view.alpha = 1.0
                         mainViewController.view.transform = CGAffineTransform.identity
-                        
+            },
+                       completion: {[weak self] res in
+                        self?.removeViewController(oldViewContoller)
             })
         } else {
             setUpViewController(mainContainerView, targetViewController: mainViewController)

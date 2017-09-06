@@ -19,12 +19,19 @@ protocol LeftMenuProtocol : class {
     func changeViewController(_ menu: LeftMenu)
 }
 
+
+class OwnNavigationController: UINavigationController {
+    deinit {
+        print("Did deinit")
+    }
+}
+
 class LeftViewController : UIViewController, LeftMenuProtocol {
     
     @IBOutlet weak var tableView: UITableView!
     var menus = ["Main", "Swift", "Java", "Go", "NonMenu"]
     var mainViewController: UIViewController!
-    var swiftViewController: UIViewController!
+    var swiftViewController: OwnNavigationController!
     var javaViewController: UIViewController!
     var goViewController: UIViewController!
     var nonMenuViewController: UIViewController!
@@ -41,7 +48,7 @@ class LeftViewController : UIViewController, LeftMenuProtocol {
         
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         let swiftViewController = storyboard.instantiateViewController(withIdentifier: "SwiftViewController") as! SwiftViewController
-        self.swiftViewController = UINavigationController(rootViewController: swiftViewController)
+        self.swiftViewController = OwnNavigationController(rootViewController: swiftViewController)
         
         let javaViewController = storyboard.instantiateViewController(withIdentifier: "JavaViewController") as! JavaViewController
         self.javaViewController = UINavigationController(rootViewController: javaViewController)
@@ -74,7 +81,10 @@ class LeftViewController : UIViewController, LeftMenuProtocol {
         case .main:
             self.slideMenuController()?.changeMainViewController(self.mainViewController, close: true)
         case .swift:
-            self.slideMenuController()?.changeMainViewController(self.swiftViewController, close: true)
+            let storyboard = UIStoryboard(name: "Main", bundle: nil)
+            let swiftVC = storyboard.instantiateViewController(withIdentifier: "SwiftViewController") as! SwiftViewController
+            let snc = OwnNavigationController(rootViewController: swiftVC)
+            self.slideMenuController()?.changeMainViewController(snc, close: true)
         case .java:
             self.slideMenuController()?.changeMainViewController(self.javaViewController, close: true)
         case .go:
